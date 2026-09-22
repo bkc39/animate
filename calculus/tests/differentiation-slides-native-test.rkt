@@ -41,7 +41,7 @@
      (check-true (regexp-match? #rx"replay" (format "~s" reports))))
    (test-case "a circular zoom changes only the lens contents"
      (define assets (prepare-example-assets! lecture-light))
-     (define close (state-at-shot-end 'hold-foerste))
+     (define close (state-at-shot-end 'lup-et-sluthold))
      (define open (hash-set close 'zoom 1))
      (define b1 (pixels (graph-picture assets open)))
      (define b2 (pixels (graph-picture assets close)))
@@ -55,7 +55,7 @@
      (check-equal? changed-outside 0))
    (test-case "dark assets remain independent of later light preparation"
      (define dark (prepare-example-assets! lecture-dark))
-     (define s (state-at-shot-end 'hold-andet))
+     (define s (state-at-shot-end 'lup-to-sluthold))
      (define before (pixels (graph-picture dark s)))
      (prepare-example-assets! lecture-light)
      (check-equal? before (pixels (graph-picture dark s)))

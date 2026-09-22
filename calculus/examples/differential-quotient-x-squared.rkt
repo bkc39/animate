@@ -2,7 +2,7 @@
 ;; Differentiation af x^2 — a slides production following the original video.
 ;; Revised from f1bd4f983bffbedddbeed18864f082b71651c5ce, same example path.
 ;; Requiring this module never starts TeX, video rendering, or file output.
-(require racket/list racket/class racket/file racket/path racket/cmdline json
+(require racket/list racket/class racket/file racket/path racket/system racket/cmdline json
          (prefix-in p: pict)
          (prefix-in a: animate)
          animate/slides animate/slides/render animate/slides/pict animate/slides/scene
@@ -45,7 +45,7 @@
                 (region 'caption #:basis .7 #:align 'center #:valign 'center))
           #:fallback 'wide))
 
-(define (make-differentiate-x-squared-film! #:theme [theme lecture-light])
+(define (make-differentiate-x-squared-film! #:theme [theme lecture-dark])
   (define assets (prepare-example-assets! theme))
   (define panel-picts (example-assets-panels assets))
   (define theorem-content
@@ -61,12 +61,16 @@
       [title title-content]
       [theorem #:key 'theorem #:fit 'natural theorem-content]
       [caption ""]))
+  (define title-slide
+    (slide #:id 'differentiation-title #:layout 'title
+      [title title-content]
+      [subtitle ""]))
   (define explanation
     (slide #:id 'explanation #:layout split-layout
       [title title-content]
       [theorem #:key 'theorem #:fit 'natural theorem-content]
       [graph (scene-content (make-graph-scene assets) #:fit 'contain)]
-      [caption (pict-content (hash-ref (example-assets-captions assets) 'graf) #:fit 'natural)]))
+      [caption (pict-content (hash-ref (example-assets-captions assets) 'koordinatsystem) #:fit 'natural)]))
   (define opening-clip
     (build-slide opening
       (beat 'introduce-theorem
@@ -98,6 +102,7 @@
        (+ offset duration) (shot-panel s))))
   (storyboard #:id 'differential-quotient-x-squared
               #:theme theme #:format widescreen #:subtitles? #f
+    (storyboard-shot 'titel (hold-slide title-slide #:duration 4))
     (storyboard-shot 'saetning opening-clip)
     ;; Witnessed time-0 -> time-0 replay moves the same theorem scene. There
     ;; is no guessed glyph matching or double-painted text crossfade.
@@ -105,12 +110,12 @@
                       #:depth 'semantic #:duration transition-duration #:easing 'smooth)
     (storyboard-shot 'forklaring (apply build-slide explanation beats))))
 
-(define (prepare-differentiate-x-squared! #:theme [theme lecture-light])
+(define (prepare-differentiate-x-squared! #:theme [theme lecture-dark])
   (prepare-storyboard! (make-differentiate-x-squared-film! #:theme theme)))
 
 ;; Existing project/render pipeline; explicit in-process execution avoids
 ;; promising serialization of this example's custom prepared viewport closure.
-(define (make-differentiate-x-squared-project! #:theme [theme lecture-light]
+(define (make-differentiate-x-squared-project! #:theme [theme lecture-dark]
                                               #:width [width 1920] #:height [height 1080]
                                               #:fps [fps 30]
                                               #:output [output "rendered-examples"])
@@ -129,21 +134,24 @@
    #:cache (cache-spec #:policy 'off)))
 
 (define review-shots
-  '(vaelg-punkt hold-foerste andet-punkt hold-andet tangent-i-lup
-    haeldning eksempel-et eksempel-to dy-kvadrat dq-del-broek
-    graense-approach graense-regn tilbage-til-saetning opsamling))
-(define (write-differentiation-review! destination #:theme [theme lecture-light]
+  '(koordinatsystem tegn-parabel navngiv-parabel vaelg-P aflaes-x0
+    lup-et-vis lup-et-zoom-a lup-et-zoom-b lup-et-sluthold lup-et-ud
+    flyt-P-to lup-to-zoom-b navngiv-tangent vis-oversigtstangent
+    vaelg-Q aflaes-Q tegn-sekant vandret-tilvaekst lodret-tilvaekst
+    dq-del-broek dq-forkort graense-regn tilbage-til-saetning opsamling))
+(define (write-differentiation-review! destination #:theme [theme lecture-dark]
                                      #:width [width 1280] #:height [height 720])
   (when (directory-exists? destination)
     (raise-user-error 'review "Choose a fresh review directory: ~a" destination))
   (make-directory* destination)
   (define prepared (prepare-differentiate-x-squared! #:theme theme))
   (define selected
-    (append (list (cons 'saetning 8)
-                  (cons 'overgang (+ theorem-duration (/ transition-duration 2))))
+    (append (list (cons 'titel 2)
+                  (cons 'saetning (+ 4 8))
+                  (cons 'overgang (+ 4 theorem-duration (/ transition-duration 2))))
             (for/list ([id (in-list review-shots)])
               (define s (findf (lambda (s) (eq? id (shot-id s))) script))
-              (cons id (+ theorem-duration transition-duration
+              (cons id (+ 4 theorem-duration transition-duration
                           (hash-ref shot-offsets id) (shot-duration s) -1/4)))))
   (define rows
     (for/list ([entry (in-list selected)] [i (in-naturals 1)])
@@ -163,12 +171,21 @@
       (for ([r (in-list rows)])
         (fprintf out "<figure><img src='~a'><figcaption>~a — ~as</figcaption></figure>"
                  (hash-ref r 'file) (hash-ref r 'id) (hash-ref r 'time)))))
+  ;; Keep one portable archive beside the fresh review directory.  The archive
+  ;; has a single review-directory root, so index.html retains every relative
+  ;; PNG reference when opened after extraction.
+  (define archive (path-replace-extension destination #".zip"))
+  (define zip (find-executable-path "zip"))
+  (unless (and zip
+               (parameterize ([current-directory (or (path-only destination) (current-directory))])
+                 (system* zip "-qr" archive (file-name-from-path destination))))
+    (raise-user-error 'review "Could not create review archive: ~a" archive))
   destination)
 
 (module+ main
   (define mode 'review)
   (define output #f)
-  (define theme lecture-light)
+  (define theme lecture-dark)
   (define width 1920) (define height 1080) (define fps 30)
   (define (integer-option text who)
     (define n (string->number text))
@@ -183,6 +200,7 @@
    #:once-each
    [("--output") path "Fresh review directory, or video output root." (set! output path)]
    [("--dark") "Use lecture-dark." (set! theme lecture-dark)]
+   [("--light") "Use lecture-light." (set! theme lecture-light)]
    [("--width") w "Output width." (set! width (integer-option w 'width))]
    [("--height") h "Output height." (set! height (integer-option h 'height))]
    [("--fps") f "Video frames per second." (set! fps (integer-option f 'fps))]

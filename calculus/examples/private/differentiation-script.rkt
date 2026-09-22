@@ -1,141 +1,139 @@
 #lang racket/base
-;; Pure production data. Durations are draft reading/voice-over holds, not audio.
+
+;;;
+;;; Differentiation Film Manuscript
+;;;
+
+;; Pure random-access timing and Danish narration for the x-squared lesson.
+
 (require racket/list racket/math)
-(provide (struct-out shot) script theorem-duration transition-duration
-         script-duration film-duration state-at state-at-shot-end
-         initial-state shot-offsets)
+
+(provide (struct-out shot)
+         script theorem-duration transition-duration script-duration film-duration
+         state-at state-at-shot-end initial-state shot-offsets)
+
+;; shot represents one narrated visual beat.
+;;  - id       symbol?         Stable test and review cue.
+;;  - duration  positive-real? Authored duration in seconds.
+;;  - panel     symbol?         Prepared left-side teaching panel.
+;;  - target    immutable-hash? Presentation state at the endpoint.
+;;  - caption   string?         Short screen caption; empty retains the field.
+;;  - narration string?         Draft Danish narration; empty is a deliberate hold.
 (struct shot (id duration panel target caption narration) #:transparent)
+
+; theorem-duration : exact-positive-integer?
+;; Gives the theorem reading and reflection time after the four-second title.
 (define theorem-duration 22)
-(define transition-duration 3/2)
+
+; transition-duration : exact-positive-integer?
+;; Gives the semantic theorem-card move to the split layout.
+(define transition-duration 2)
+
+; initial-state : immutable-hash?
+;; Gives an empty right-hand presentation: no geometry or prepared labels paint.
 (define initial-state
-  (hash 'x0 1 'h 1 'point 0 'neighbour 0 'secant 0 'triangle 0
-        'tangent 0 'lens 0 'zoom 1))
+  (hash 'x0 1 'h 1 'axes 0 'graph 0 'graph-label 0
+        'point 0 'point-reading 0 'neighbour 0 'neighbour-reading 0
+        'secant 0 'horizontal 0 'vertical 0 'slope-result 0
+        'tangent-lens 0 'tangent-overview 0 'lens 0 'zoom 1))
+
+; S : symbol? positive-real? symbol? immutable-hash? string? string? -> shot?
+;; Builds one concise manuscript entry.
+(define (S id duration panel target caption narration)
+  (shot id duration panel target caption narration))
+
+;; The first 218 seconds realize the reviewed opening after the card move.
+;; The original algebra follows it without repeating informal introductions.
 (define script
   (list
-   (shot 'graf 10 'theorem (hash)
-         "Funktionen har en graf."
-         "Lad os se på, hvad sætningen siger. Funktionen f af x lig med x i anden har en graf. Det er en parabel.")
-   (shot 'vaelg-punkt 12 'theorem (hash 'point 1)
-         "Vi vælger et sted på x-aksen."
-         "Vi vælger et vilkårligt sted på x-aksen og kalder det x nul. Det tilsvarende punkt på grafen har koordinaterne x nul og f af x nul.")
-   (shot 'zoom-foerste 12 'theorem (hash 'lens 1 'zoom 40)
-         "Vi zoomer ind omkring punktet."
-         "At funktionen er differentiabel betyder her, uformelt, at grafen kommer til at ligne en ret linje, når vi zoomer ind omkring punktet.")
-   (shot 'hold-foerste 7 'theorem (hash)
-         "Grafen kommer til at ligne en ret linje."
-         "Punktet bliver i midten. Vi ser stadig på den samme parabel, men nu ser den næsten ret ud.")
-   (shot 'zoom-ud-foerste 6 'theorem (hash 'zoom 1)
-         "Vi zoomer ud igen."
-         "Lad os zoome ud igen.")
-   (shot 'fjern-lup-foerste 2 'theorem (hash 'lens 0)
-         ""
-         "")
-   (shot 'andet-punkt 7 'theorem (hash 'x0 2)
-         "Vi vælger et andet punkt."
-         "Vi kunne have valgt et andet sted. Lad os flytte punktet og gøre det samme igen.")
-   (shot 'zoom-andet 12 'theorem (hash 'lens 1 'zoom 40)
-         "Det samme sker ved et andet punkt."
-         "Når vi zoomer ind omkring det nye punkt, kommer grafen igen til at ligne en ret linje. Det er betydningen af differentiabel i hele R: vi kan gøre det ved ethvert punkt.")
-   (shot 'hold-andet 7 'theorem (hash)
-         "Linjen kaldes tangenten."
-         "Den linje, grafen ligner lokalt, kalder vi tangenten.")
-   (shot 'tangent-i-lup 6 'theorem (hash 'tangent 1)
-         "Tangenten lægges oven på grafen."
-         "Vi lægger tangenten oven på grafen, så vi kan følge den, når vi zoomer ud.")
-   (shot 'zoom-ud-andet 6 'theorem (hash 'zoom 1)
-         "Vi ser tangenten i det store koordinatsystem."
-         "Nu zoomer vi ud igen. Tangenten går gennem det punkt på grafen, vi valgte.")
-   (shot 'fjern-lup-andet 2 'theorem (hash 'lens 0)
-         ""
-         "")
-   (shot 'haeldning 15 'slope-meaning (hash)
-         "Den afledede funktion giver tangenthældningen."
-         "Den næste del af sætningen fortæller, hvad tangentens hældning er. Når den afledede funktion er to x, er tangenthældningen ved x nul lig med to gange x nul.")
-   (shot 'eksempel-et 8 'slope-one (hash 'x0 1)
-         "Ved 1 er tangenthældningen 2."
-         "Hvis x nul er et, bliver tangenthældningen to gange et, altså to.")
-   (shot 'eksempel-to 8 'slope-two (hash 'x0 2)
-         "Ved 2 er tangenthældningen 4."
-         "Hvis x nul er to, bliver tangenthældningen to gange to, altså fire.")
-   (shot 'vilkaarligt-punkt 12 'two-goals (hash 'x0 1)
-         "Vi skal bevise to ting for et vilkårligt sted."
-         "For ethvert x nul skal vi vise to ting: Funktionen er differentiabel i x nul, og den afledede i x nul er to gange x nul.")
-   (shot 'tretrinsreglen 12 'three-steps (hash 'tangent 0)
-         "Vi bruger tretrinsreglen."
-         "Vi lader nu x nul være givet. En god strategi er tretrinsreglen. Først funktions-tilvæksten, så differenskvotienten og til sidst grænseværdien.")
-   (shot 'nabopunkt 15 'step-one (hash 'neighbour 1 'secant 1)
-         "Vi vælger et nabopunkt og tegner sekanten."
-         "Vi tager et nabopunkt på grafen. Dets x-koordinat er x nul plus h. Den rette linje gennem de to punkter er sekanten. Dens hældning kan vi regne ud.")
-   (shot 'tilvaekster 18 'increments (hash 'triangle 1)
-         "Vandret tilvækst og lodret tilvækst."
-         "X-tilvæksten er h. Y-tilvæksten er forskellen mellem de to funktionsværdier. Den kalder vi delta y.")
-   (shot 'dy-definition 20 'dy-definition (hash)
-         "Trin 1: Udregn funktions-tilvæksten."
-         "Funktions-tilvæksten er f af x nul plus h, minus f af x nul. Vi trækker altså den gamle y-værdi fra den nye.")
-   (shot 'dy-indsaet 16 'dy-substitute (hash)
-         "Vi bruger, at funktionen sætter i anden."
-         "Da f af x er x i anden, får vi x nul plus h i anden, minus x nul i anden.")
-   (shot 'dy-kvadrat 22 'dy-expand (hash)
-         "Vi bruger første kvadratsætning."
-         "Kvadratet giver x nul i anden plus h i anden plus det dobbelte produkt, to gange x nul gange h. Til sidst står der stadig minus x nul i anden.")
-   (shot 'dy-forkort 14 'dy-cancel (hash)
-         "De to kvadratled går ud med hinanden."
-         "X nul i anden går ud med minus x nul i anden. Derfor er funktions-tilvæksten h i anden plus to gange x nul gange h.")
-   (shot 'dq-definition 18 'dq-definition (hash)
-         "Trin 2: Udregn differenskvotienten."
-         "Differenskvotienten er sekantens hældning. Vi dividerer y-tilvæksten med x-tilvæksten, som er h. De to punkter er forskellige, så h er ikke nul.")
-   (shot 'dq-del-broek 18 'dq-split (hash)
-         "Vi dividerer hvert led i tælleren med h."
-         "Vi deler brøken op i to. Først h i anden divideret med h, og så to gange x nul gange h divideret med h.")
-   (shot 'dq-forkort 16 'dq-cancel (hash)
-         "Vi har nu fundet sekantens hældning."
-         "I det første led står der h gange h divideret med h, så det giver h. I det andet led går gange h og divideret med h ud med hinanden. Tilbage står h plus to gange x nul.")
-   (shot 'graense-start 12 'limit-start (hash)
-         "Trin 3: Undersøg grænseværdien."
-         "Nu skal vi undersøge, hvad der sker med differenskvotienten, når h går mod nul. X nul er fast under denne undersøgelse.")
-   (shot 'graense-approach 16 'limit-start (hash 'h 1/100 'triangle 0)
-         "Nabopunktet nærmer sig det faste punkt."
-         "Vi lader nabopunktet komme tættere og tættere på. Sekanthældningen er hele tiden h plus to gange x nul. H bliver mindre, mens to gange x nul er konstant.")
-   (shot 'graense-regn 22 'limit-result (hash)
-         "Nu bestemmer vi grænseværdien."
-         "H går mod nul. To gange x nul afhænger ikke af h. Grænseværdien af summen er derfor nul plus to gange x nul, altså to gange x nul.")
-   (shot 'bevis-tangent 14 'proved (hash 'neighbour 0 'secant 0 'tangent 1)
-         "Sekanthældningerne har en grænseværdi."
-         "Nu har vi vist, at sekanthældningerne har en grænseværdi. Derfor er funktionen differentiabel i x nul. Grænseværdien er tangentens hældning, så den afledede i x nul er to gange x nul.")
-   (shot 'alle-steder 14 'proved (hash 'x0 -1)
-         "Beregningen gælder for ethvert reelt sted."
-         "Der var ikke noget særligt ved det x nul, vi valgte. Den samme udregning virker for ethvert reelt x nul.")
-   (shot 'tilbage-til-saetning 12 'theorem (hash 'x0 1)
-         "Dermed har vi bevist sætningen."
-         "Funktionen f af x lig med x i anden er altså differentiabel i hele R, og dens afledede funktion er f mærke x lig med to x.")
-   (shot 'opsamling 18 'summary (hash)
-         "Funktions-tilvækst. Differenskvotient. Grænseværdi."
-         "Det er de tre trin: Først funktions-tilvæksten, så differenskvotienten og til sidst grænseværdien. Dermed har vi bevist vores sætning.")
-   ))
+   (S 'koordinatsystem 6 'theorem (hash 'axes 1) "" "Her er et koordinatsystem. Vi skal tegne grafen for funktionen.")
+   (S 'tegn-parabel 5 'theorem (hash 'graph 1) "" "Funktionen f af x lig med x i anden har en parabel som graf.")
+   (S 'navngiv-parabel 4 'theorem (hash 'graph-label 1) "Grafen for f(x)=x²." "")
+   (S 'vaelg-P 5 'theorem (hash 'point 1) "Vi vælger et punkt P på grafen." "Vi vælger et punkt på grafen og kalder det P.")
+   (S 'aflaes-x0 9 'theorem (hash 'point-reading 1) "Punktets førstekoordinat er x₀." "Vi aflæser punktets førstekoordinat på x-aksen. Den kalder vi x nul.")
+   (S 'forklar-differentiabel 8 'theorem (hash) "Hvordan ser grafen ud tæt ved P?" "Uformelt betyder differentiabel her, at grafen kommer til at ligne en ret linje, når vi zoomer ind omkring punktet.")
+   (S 'lup-et-vis 4 'theorem (hash 'lens 1) "Vi zoomer omkring P." "Vi holder øje med et lille område omkring punktet.")
+   (S 'lup-et-zoom-a 6 'theorem (hash 'zoom 2) "" "Nu zoomer vi langsomt ind. Punktet bliver i midten.")
+   (S 'lup-et-mellemhold 2 'theorem (hash) "" "")
+   (S 'lup-et-zoom-b 7 'theorem (hash 'zoom 8) "" "Kurven ser mere og mere ret ud.")
+   (S 'lup-et-zoom-c 4 'theorem (hash 'zoom 40) "" "")
+   (S 'lup-et-sluthold 7 'theorem (hash) "Grafen ser lokalt næsten ret ud." "Nu ligner grafen næsten en ret linje. Det er stadig den samme parabel.")
+   (S 'lup-et-ud 7 'theorem (hash 'zoom 1) "" "Lad os zoome ud igen.")
+   (S 'lup-et-vaek 2 'theorem (hash 'lens 0) "" "")
+   (S 'flyt-P-to 6 'theorem (hash 'x0 2) "Vi vælger et andet punkt." "Vi kunne have valgt et andet punkt. Lad os prøve her.")
+   (S 'lup-to-vis 4 'theorem (hash 'lens 1) "" "Igen ser vi på området omkring punktet.")
+   (S 'lup-to-zoom-a 5 'theorem (hash 'zoom 2) "" "Vi zoomer ind på samme måde.")
+   (S 'lup-to-mellemhold 2 'theorem (hash) "" "")
+   (S 'lup-to-zoom-b 6 'theorem (hash 'zoom 8) "" "")
+   (S 'lup-to-zoom-c 4 'theorem (hash 'zoom 40) "" "")
+   (S 'lup-to-sluthold 6 'theorem (hash) "Sætningen gælder for alle x₀ i R." "Også her ser grafen næsten ret ud. Sætningen siger, at det gælder ved ethvert punkt på grafen.")
+   (S 'navngiv-tangent 7 'theorem (hash 'tangent-lens 1) "Linjen kaldes tangenten." "Den linje, grafen ligner lokalt, kalder vi tangenten.")
+   (S 'lup-to-ud 7 'theorem (hash 'zoom 1) "" "Når vi zoomer ud, kan vi se tangenten i det store koordinatsystem.")
+   (S 'vis-oversigtstangent 3 'theorem (hash 'tangent-overview 1 'lens 0) "" "")
+   (S 'fortolk-afledet 11 'slope-meaning (hash) "Tangenthældningen er f'(x₀)=2x₀." "Den næste del af sætningen fortæller os tangentens hældning.")
+   (S 'haeldning-et 11 'slope-one (hash 'x0 1) "Ved x₀=1 er hældningen 2." "Hvis x nul er et, er hældningen to gange et, altså to.")
+   (S 'haeldning-to 11 'slope-two (hash 'x0 2) "Ved x₀=2 er hældningen 4." "Hvis x nul er to, er hældningen to gange to, altså fire.")
+   (S 'to-bevismaal 13 'two-goals (hash 'x0 1) "Nu skal vi bevise de to udsagn." "Nu skal vi bevise to ting ved et vilkårligt x nul.")
+   (S 'tretrin 11 'three-steps (hash 'tangent-overview 0) "Vi bruger tretrinsreglen." "Vi lader x nul være givet og bruger tretrinsreglen.")
+   (S 'vaelg-Q 6 'step-one (hash 'neighbour 1) "Vi vælger et nabopunkt Q." "For at regne hældningen ud vælger vi et nabopunkt Q på grafen.")
+   (S 'aflaes-Q 7 'step-one (hash 'neighbour-reading 1) "Nabopunktets førstekoordinat er x₀+h." "Vi kalder dets førstekoordinat x nul plus h.")
+   (S 'tegn-sekant 7 'step-one (hash 'secant 1) "Linjen gennem P og Q er sekanten." "Den rette linje gennem de to punkter er en sekant.")
+   (S 'vandret-tilvaekst 7 'increments (hash 'horizontal 1) "Δx=h." "Den vandrette tilvækst er h.")
+   (S 'lodret-tilvaekst 8 'increments (hash 'vertical 1) "Δy=f(x₀+h)-f(x₀)." "Den lodrette tilvækst kalder vi delta y.")
+   (S 'dy-definition 20 'dy-definition (hash) "Trin 1: Udregn funktions-tilvæksten." "Funktions-tilvæksten er f af x nul plus h, minus f af x nul.")
+   (S 'dy-indsaet 16 'dy-substitute (hash) "Vi bruger, at funktionen sætter i anden." "Da f af x er x i anden, får vi x nul plus h i anden, minus x nul i anden.")
+   (S 'dy-kvadrat 22 'dy-expand (hash) "Vi bruger første kvadratsætning." "Kvadratet giver x nul i anden plus h i anden plus det dobbelte produkt.")
+   (S 'dy-forkort 14 'dy-cancel (hash) "De to kvadratled går ud med hinanden." "Derfor er funktions-tilvæksten h i anden plus to gange x nul gange h.")
+   (S 'dq-definition 18 'dq-definition (hash) "Trin 2: Udregn differenskvotienten." "Differenskvotienten er sekantens hældning.")
+   (S 'dq-del-broek 18 'dq-split (hash) "Vi dividerer hvert led i tælleren med h." "Vi deler brøken op i to.")
+   (S 'dq-forkort 16 'dq-cancel (hash 'slope-result 1) "Vi har nu fundet sekantens hældning." "Tilbage står h plus to gange x nul.")
+   (S 'graense-start 12 'limit-start (hash) "Trin 3: Undersøg grænseværdien." "Nu skal vi undersøge, hvad der sker med differenskvotienten, når h går mod nul.")
+   (S 'graense-approach 16 'limit-start (hash 'h 1/100 'vertical 0) "Nabopunktet nærmer sig det faste punkt." "Vi lader nabopunktet komme tættere og tættere på.")
+   (S 'graense-regn 22 'limit-result (hash) "Nu bestemmer vi grænseværdien." "H går mod nul. Grænseværdien er derfor to gange x nul.")
+   (S 'bevis-tangent 14 'proved (hash 'neighbour 0 'secant 0 'slope-result 0 'tangent-overview 1) "Sekanthældningerne har en grænseværdi." "Nu har vi vist, at sekanthældningerne har en grænseværdi.")
+   (S 'alle-steder 14 'proved (hash 'x0 -1) "Beregningen gælder for ethvert reelt sted." "Der var ikke noget særligt ved det x nul, vi valgte.")
+   (S 'tilbage-til-saetning 12 'theorem (hash 'x0 1) "Dermed har vi bevist sætningen." "Funktionen f af x lig med x i anden er altså differentiabel i hele R.")
+   (S 'opsamling 18 'summary (hash) "Funktions-tilvækst. Differenskvotient. Grænseværdi." "Det er de tre trin. Dermed har vi bevist vores sætning.")))
+
+; script-duration : nonnegative-real?
+;; Gives the accumulated duration of the split-screen lesson.
 (define script-duration (apply + (map shot-duration script)))
-(define film-duration (+ theorem-duration transition-duration script-duration))
+
+; film-duration : nonnegative-real?
+;; Gives title, theorem, move, and lesson duration.
+(define film-duration (+ 4 theorem-duration transition-duration script-duration))
+
+; shot-offsets : immutable-hash?
+;; Maps each cue to a time relative to the split-screen lesson.
 (define shot-offsets
   (for/fold ([table (hash)] [time 0] #:result table) ([s (in-list script)])
     (values (hash-set table (shot-id s) time) (+ time (shot-duration s)))))
+
+; smooth : real? -> real?
+;; Gives the cubic ease used for one authored component track.
 (define (smooth t) (* t t (- 3 (* 2 t))))
+
+; apply-target : immutable-hash? immutable-hash? -> immutable-hash?
+;; Installs an exact state endpoint.
 (define (apply-target state target)
-  (for/fold ([state state]) ([(key value) (in-hash target)])
-    (hash-set state key value)))
-;; Changes occupy at most the first 2/3 of a narrated beat. The final hold
-;; exposes an exact endpoint before the next operation begins.
-(define (sample-change before s local)
-  (define target (shot-target s))
-  (for/fold ([state before]) ([(key finish) (in-hash target)])
+  (for/fold ([next state]) ([(key value) (in-hash target)])
+    (hash-set next key value)))
+
+; sample-change : immutable-hash? shot? nonnegative-real? -> immutable-hash?
+;; Samples an entire authored beat without a hidden global timing cap.
+(define (sample-change before current local)
+  (for/fold ([next before]) ([(key finish) (in-hash (shot-target current))])
     (define start (hash-ref before key))
-    (define change-time
-      (if (memq key '(point neighbour secant triangle tangent lens))
-          (min 4/5 (shot-duration s))
-          (min 8 (* 2/3 (shot-duration s)))))
-    (define p (smooth (min 1 (max 0 (/ local change-time)))))
-    (hash-set state key
-      (cond [(= p 0) start] [(= p 1) finish]
-            [(eq? key 'zoom) (exp (+ (log start) (* p (- (log finish) (log start)))))]
-            [else (+ start (* p (- finish start)))]))))
+    (define progress (smooth (min 1 (max 0 (/ local (shot-duration current))))))
+    (hash-set next key
+              (cond [(= progress 0) start]
+                    [(= progress 1) finish]
+                    [(eq? key 'zoom)
+                     (exp (+ (log start) (* progress (- (log finish) (log start)))))]
+                    [else (+ start (* progress (- finish start)))]))))
+
+; state-at : real? -> immutable-hash?
+;; Samples the presentation state independently of rendering order.
 (define (state-at time)
   (unless (and (real? time) (not (nan? time)) (not (infinite? time))
                (<= 0 time script-duration))
@@ -143,12 +141,15 @@
   (let loop ([remaining script] [offset 0] [state initial-state])
     (cond [(null? remaining) state]
           [else
-           (define s (car remaining))
-           (define end (+ offset (shot-duration s)))
+           (define current (car remaining))
+           (define end (+ offset (shot-duration current)))
            (if (< time end)
-               (sample-change state s (- time offset))
-               (loop (cdr remaining) end (apply-target state (shot-target s))))])))
+               (sample-change state current (- time offset))
+               (loop (cdr remaining) end (apply-target state (shot-target current))))])))
+
+; state-at-shot-end : symbol? -> immutable-hash?
+;; Samples the exact endpoint of a named cue.
 (define (state-at-shot-end id)
-  (define s (findf (lambda (s) (eq? id (shot-id s))) script))
-  (unless s (raise-argument-error 'state-at-shot-end "script shot id" id))
-  (state-at (+ (hash-ref shot-offsets id) (shot-duration s))))
+  (define current (findf (lambda (candidate) (eq? id (shot-id candidate))) script))
+  (unless current (raise-argument-error 'state-at-shot-end "script shot id" id))
+  (state-at (+ (hash-ref shot-offsets id) (shot-duration current))))
