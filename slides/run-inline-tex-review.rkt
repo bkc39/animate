@@ -125,16 +125,18 @@
                             (prepared-clip-value-slide
                              (prepared-shot-clip
                               (car (prepared-storyboard-value-shots prepared)))))))
-  (define calculus-prepared
-    (prepare-calculus-lesson differentiate-x-squared #:width 960 #:height 540))
-  (define calculus-plan (prepared-lesson-plan calculus-prepared))
-  (define calculus-duration (calculus-plan-duration calculus-plan))
+  ;; The x-squared example is now authored as a slide storyboard.  Sample the
+  ;; exported prepared storyboard directly, rather than the retired calculus
+  ;; lesson value that used to back this review.
+  (define calculus-prepared (prepare-differentiate-x-squared!))
+  (define calculus-duration (prepared-duration calculus-prepared))
   (for ([sample (in-list (list (cons "initial" 'initial)
                                 (cons "middle" (/ calculus-duration 2))
                                 (cons "final" 'final)))])
     (record! (string-append "x squared calculus lesson / " (car sample))
              (format "calculus/x-squared-~a.png" (car sample))
-             (prepared-lesson->pict calculus-prepared #:at (cdr sample))))
+             (storyboard->pict calculus-prepared #:at (cdr sample)
+                               #:size '(960 540))))
   (define video #f)
   (define project-diagnostics #f)
   (when include-video?

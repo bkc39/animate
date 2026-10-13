@@ -188,6 +188,19 @@ and line spacing are part of preparation, so later reveal, replacement, and
 Scene sampling replay fixed geometry without TeX calls or reflow. Raw
 @racket[draw-text] calls, speaker notes, and SRT/WebVTT text remain literal.
 
+@subsection[#:tag "reference-slide-pict-and-image-content"]{Pict and image content}
+
+@declare-exporting[
+ animate/slides
+ #:use-sources
+ (animate/slides/private/appearance
+  animate/slides/private/layout
+  animate/slides/private/model
+  animate/slides/private/data
+  animate/slides/private/semantic-model
+  animate/slides/private/syntax
+  animate/slides/main)]
+
 @defproc[(pict-content [picture-or-factory any/c]
                        [#:fit fit (or/c 'contain 'cover 'natural) 'contain]) content?]{
 Wraps a Pict or a one-argument factory. A factory receives a content context during
