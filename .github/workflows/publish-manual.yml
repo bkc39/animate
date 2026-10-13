@@ -1,0 +1,78 @@
+name: Publish manual
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the source
+        uses: actions/checkout@v4
+
+      - name: Install Racket
+        uses: Bogdanp/setup-racket@v1.11
+        with:
+          version: "9.3"
+
+      - name: Install documentation dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends dvisvgm libpoppler-glib8 texlive-latex-extra
+
+      - name: Install Animate
+        run: |
+          ./tools/ci-bootstrap-svg.sh
+          raco pkg install --auto --batch --name animate "$GITHUB_WORKSPACE"
+          raco setup --pkgs animate
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build the manual
+        run: racket tools/check-documentation.rkt "$RUNNER_TEMP/animate-manual"
+
+      - name: Add a Pages landing page
+        run: |
+          cat > "$RUNNER_TEMP/animate-manual/index.html" <<'EOF'
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <meta http-equiv="refresh" content="0; url=animate/">
+              <link rel="canonical" href="animate/">
+              <title>Animate manual</title>
+            </head>
+            <body>
+              <p><a href="animate/">Open the Animate manual</a></p>
+            </body>
+          </html>
+          EOF
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ runner.temp }}/animate-manual
+
+  deploy:
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
