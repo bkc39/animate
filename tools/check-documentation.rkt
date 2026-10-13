@@ -35,12 +35,16 @@
 
 ;; resolve-racket-executable : path-string? -> path?
 ;; Preserve a supplied symlink: executing it keeps Racket's own installation
-;; layout and package configuration intact. `path->complete-path` merely makes
-;; diagnostics and subprocess launch independent of the caller's directory.
+;; layout and package configuration intact. A bare command such as `racket`
+;; is resolved through PATH; an explicit path remains untouched apart from
+;; becoming complete for diagnostics and subprocess launch.
 (define (resolve-racket-executable executable)
   (unless (path-string? executable)
     (raise-argument-error 'check-documentation "path-string?" executable))
-  (define complete (path->complete-path executable))
+  (define resolved
+    (or (and (relative-path? executable) (find-executable-path executable))
+        executable))
+  (define complete (path->complete-path resolved))
   (unless (file-exists? complete)
     (raise-arguments-error
      'check-documentation
@@ -170,7 +174,10 @@
         (display "#lang scribble/manual\n@title{Launcher fixture}\n" port)))
      (make-file-or-directory-link runtime linked-runtime)
      (check-false (file-exists? (build-path temporary-root "raco")))
-     (for ([executable (in-list (list runtime linked-runtime))])
+     ;; A workflow runner normally supplies Racket as the bare command
+     ;; `racket` on PATH. Preserve that supported route in addition to the
+     ;; absolute and symlinked executable cases.
+     (for ([executable (in-list (list runtime linked-runtime "racket"))])
        (define-values (status log)
          (run-raco-command
           executable
